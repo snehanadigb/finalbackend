@@ -29,19 +29,35 @@ model Customer {
 }
 
 model Document {
-  id              Int      @id @default(autoincrement())
-  filePath        String
-  verificationStatus String @default("Pending")
-  customerId      Int
-  customer        Customer @relation(fields: [customerId], references: [id])
+  id                Int       @id @default(autoincrement())
+  filePath          String
+  customerId        Int
+  verificationStatus String   // 'Pending', 'Verified', 'Failed'
+ // Document upload time
+  verificationDate  DateTime? // Time when document was verified or failed
+  customer          Customer  @relation(fields: [customerId], references: [id])
 }
 
 model Service {
-  id         Int       @id @default(autoincrement())
-  name       String
-  isActive   Boolean   @default(false)
-  customerId Int
-  customer   Customer @relation(fields: [customerId], references: [id])
+  id                Int       @id @default(autoincrement())
+  name              String
+  isActive          Boolean    @default(false)
+  customerId        Int
+  planId            Int       // Associate each service with a plan
+  customer          Customer   @relation(fields: [customerId], references: [id])
+  plan              Plan       @relation(fields: [planId], references: [id])
+}
+
+model Plan {
+  id                    Int       @id @default(autoincrement())
+  name                  String
+  description           String
+  price                 Float
+  servicesIncluded      Json
+  planType              String 
+  services              Service[] // Track services associated with this plan
+  serviceActivatedCount Int       @default(0)
+   // Count of activated services for this plan
 }
 model Admin {
   id        Int     @id @default(autoincrement())

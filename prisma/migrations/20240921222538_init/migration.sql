@@ -20,8 +20,9 @@ CREATE TABLE `Customer` (
 CREATE TABLE `Document` (
     `id` INTEGER NOT NULL AUTO_INCREMENT,
     `filePath` VARCHAR(191) NOT NULL,
-    `verificationStatus` VARCHAR(191) NOT NULL DEFAULT 'Pending',
     `customerId` INTEGER NOT NULL,
+    `verificationStatus` VARCHAR(191) NOT NULL,
+    `verificationDate` DATETIME(3) NULL,
 
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -32,6 +33,20 @@ CREATE TABLE `Service` (
     `name` VARCHAR(191) NOT NULL,
     `isActive` BOOLEAN NOT NULL DEFAULT false,
     `customerId` INTEGER NOT NULL,
+    `planId` INTEGER NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- CreateTable
+CREATE TABLE `Plan` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `name` VARCHAR(191) NOT NULL,
+    `description` VARCHAR(191) NOT NULL,
+    `price` DOUBLE NOT NULL,
+    `servicesIncluded` JSON NOT NULL,
+    `planType` VARCHAR(191) NOT NULL,
+    `serviceActivatedCount` INTEGER NOT NULL DEFAULT 0,
 
     PRIMARY KEY (`id`)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -52,3 +67,6 @@ ALTER TABLE `Document` ADD CONSTRAINT `Document_customerId_fkey` FOREIGN KEY (`c
 
 -- AddForeignKey
 ALTER TABLE `Service` ADD CONSTRAINT `Service_customerId_fkey` FOREIGN KEY (`customerId`) REFERENCES `Customer`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE `Service` ADD CONSTRAINT `Service_planId_fkey` FOREIGN KEY (`planId`) REFERENCES `Plan`(`id`) ON DELETE RESTRICT ON UPDATE CASCADE;

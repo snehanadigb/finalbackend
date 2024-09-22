@@ -48,7 +48,7 @@ const verifyDocument = async (filePath) => {
         const response = await axios.post('http://localhost:5009/extract', {
             filePath: filePath
         });
-        console.log(response.data);
+        console.log(response.data.success);
         return response.data; // Response from Aadhaar verification service
     } catch (error) {
         console.error('Error during document verification:', error);
@@ -57,7 +57,8 @@ const verifyDocument = async (filePath) => {
 };
 
 // Route to handle document upload and initiate verification
-router.post('/upload',  upload.single('document'), async (req, res) => {
+// Route to handle document upload and initiate verification
+router.post('/upload', upload.single('document'), async (req, res) => {
     try {
         const customerId = req.query.customerId;
 
@@ -75,7 +76,7 @@ router.post('/upload',  upload.single('document'), async (req, res) => {
         if (existingDocument && existingDocument.verificationStatus === 'Failed') {
             await prisma.document.update({
                 where: { id: existingDocument.id },
-                data: { verificationStatus: 'Pending' } // Reset status before new upload
+                data: { verificationStatus: 'Failed' } // Reset status before new upload
             });
         }
 
@@ -84,23 +85,45 @@ router.post('/upload',  upload.single('document'), async (req, res) => {
         // Send file to Aadhaar verification service
         const verificationResult = await verifyDocument(filePath);
 
-        // Update verification status if Aadhaar is verified
+        // Handle verification result
         if (verificationResult.success === true) {
             await prisma.document.update({
                 where: { id: document.id },
-                data: { verificationStatus: 'Verified' }
+                data: {
+                    verificationStatus: 'Verified',
+                    verificationDate: new Date(),
+                }
+            });
+        } else if (verificationResult.success === false && verificationResult.message === 'No Aadhaar number found in the image') {
+            // Update document status to 'Failed' if no Aadhaar number was found
+            await prisma.document.update({
+                where: { id: document.id },
+                data: {
+                    verificationStatus: 'Failed',
+                    verificationDate: new Date(),
+                }
+            });
+        
+            return res.status(400).json({
+                message: 'Document verification failed: No Aadhaar number found',
+                verificationStatus: 'Failed'
             });
         } else {
-            // Delete the document if verification fails
-            await prisma.document.delete({
-                where: { id: document.id }
+            // Handle other verification failures
+            await prisma.document.update({
+                where: { id: document.id },
+                data: {
+                    verificationStatus: 'Failed',
+                    verificationDate: new Date(),
+                }
             });
+        
             return res.status(400).json({
-                message: 'Document verification failed, document has been deleted',
+                message: 'Document verification failed',
                 verificationStatus: 'Failed'
             });
         }
-
+        
         res.status(201).json({
             message: 'Document uploaded successfully',
             verificationStatus: verificationResult.verificationResponse.status
