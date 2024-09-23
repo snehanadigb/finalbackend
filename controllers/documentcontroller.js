@@ -4,6 +4,7 @@ const path = require('path');
 const fs = require('fs');
 const axios = require('axios');
 const { PrismaClient } = require('@prisma/client');
+const authenticateJWT = require('../middleware/authMiddleware');
 //const authenticateJWT = require('../middleware/authmiddleware');
 
 const prisma = new PrismaClient();
@@ -58,7 +59,7 @@ const verifyDocument = async (filePath) => {
 
 // Route to handle document upload and initiate verification
 // Route to handle document upload and initiate verification
-router.post('/upload', upload.single('document'), async (req, res) => {
+router.post('/upload',authenticateJWT, upload.single('document'), async (req, res) => {
     try {
         const customerId = req.query.customerId;
 

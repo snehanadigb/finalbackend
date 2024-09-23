@@ -9,6 +9,7 @@ CREATE TABLE `Customer` (
     `address` VARCHAR(191) NOT NULL,
     `otp` INTEGER NULL,
     `isVerified` BOOLEAN NOT NULL DEFAULT false,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
     `resetToken` VARCHAR(191) NULL,
     `resetTokenExpiry` DATETIME(3) NULL,
 

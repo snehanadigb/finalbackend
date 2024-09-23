@@ -48,31 +48,39 @@ const getPlanById = async (req, res) => {
       res.status(500).json({ message: 'Failed to fetch plan' });
     }
   };
-// Fetch all customers whose documents are pending verification
-// Fetch all customers whose documents are pending verification
-const getPendingCustomers = async (req, res) => {
+  const getPendingCustomers = async (req, res) => {
     const { search } = req.query; // Get the search query
 
-    try {
-        const pendingCustomers = await prisma.customer.findMany({
-            where: {
-                documents: {
-                    none: {}
+   
+        try {
+            const pendingCustomers = await prisma.customer.findMany({
+                where: {
+                    documents: {
+                        every: {
+                            verificationStatus: { not: 'verified' } // No document should have 'verified' status
+                        }
+                    },
+                    // Apply search filter if provided
+                    ...(search
+                        ? {
+                              OR: [
+                                  { first_name: { contains: search } },
+                                  { last_name: { contains: search } },
+                                  { email: { contains: search } }
+                              ]
+                          }
+                        : {})
                 },
-                OR: search ? [
-                    { first_name: { contains: search, mode: 'insensitive' } },
-                    { last_name: { contains: search, mode: 'insensitive' } },
-                    { email: { contains: search, mode: 'insensitive' } }
-                ] : undefined // Apply the search filter if provided
-            },
-            include: {
-                services: true
-            }
-        });
-        res.status(200).json(pendingCustomers);
-    } catch (error) {
-        res.status(500).json({ message: 'Failed to retrieve customers without documents', error });
-    }
+                include: {
+                    services: true
+                }
+            });
+            res.status(200).json(pendingCustomers);
+        } catch (error) {
+            console.error('Error fetching pending customers:', error);
+            res.status(500).json({ message: 'Failed to retrieve pending customers', error });
+        }
+        
 };
 
 // Fetch all customers whose documents are verified
@@ -86,24 +94,26 @@ const getVerifiedCustomers = async (req, res) => {
                     {
                         documents: {
                             some: {
-                                verificationStatus: 'Verified'
+                                verificationStatus: "Verified" // Documents are verified
                             }
                         }
                     },
                     {
                         services: {
                             some: {
-                                isActive: false
+                                isActive: false // Services are not activated
                             }
                         }
                     },
-                    {
-                        OR: search ? [
-                            { first_name: { contains: search, mode: 'insensitive' } },
-                            { last_name: { contains: search, mode: 'insensitive' } },
-                            { email: { contains: search, mode: 'insensitive' } }
-                        ] : undefined // Apply the search filter if provided
-                    }
+                    search
+                        ? {
+                              OR: [
+                                  { first_name: { contains: search } }, // Search for first name
+                                  { last_name: { contains: search } },  // Search for last name
+                                  { email: { contains: search } }       // Search for email
+                              ]
+                          }
+                        : {}
                 ]
             },
             include: {
@@ -111,11 +121,14 @@ const getVerifiedCustomers = async (req, res) => {
                 services: true
             }
         });
+
         res.status(200).json(verifiedCustomers);
     } catch (error) {
+        console.error('Error fetching verified customers:', error);
         res.status(500).json({ message: 'Failed to retrieve verified customers', error });
     }
 };
+
 
 // Fetch all activated customers
 const getActivatedCustomers = async (req, res) => {
@@ -126,14 +139,19 @@ const getActivatedCustomers = async (req, res) => {
             where: {
                 services: {
                     some: {
-                        isActive: true
+                        isActive: true // Services are activated
                     }
                 },
-                OR: search ? [
-                    { first_name: { contains: search, mode: 'insensitive' } },
-                    { last_name: { contains: search, mode: 'insensitive' } },
-                    { email: { contains: search, mode: 'insensitive' } }
-                ] : undefined // Apply the search filter if provided
+                // Apply search filter if provided
+                ...(search
+                    ? {
+                          OR: [
+                              { first_name: { contains: search } },
+                              { last_name: { contains: search } },
+                              { email: { contains: search } }
+                          ]
+                      }
+                    : {})
             },
             include: {
                 documents: true,
@@ -142,6 +160,7 @@ const getActivatedCustomers = async (req, res) => {
         });
         res.status(200).json(activatedCustomers);
     } catch (error) {
+        console.error('Error fetching activated customers:', error);
         res.status(500).json({ message: 'Failed to retrieve activated customers', error });
     }
 };
@@ -164,6 +183,7 @@ const getAllServices = async (req, res) => {
 const selectService = async (req, res) => {
     const { planId, customerId,name } = req.body;
     try {
+        console.log(planId);
         const service = await prisma.service.create({
             data: {
                 name: name,
@@ -271,5 +291,57 @@ async function getCustomerIds(search) {
 
     return customers.map(customer => customer.id);
 }
+const statistics = async (req, res) => {
+    try {
+        // Fetch counts for prepaid and postpaid
+        const prepaidStats = await prisma.plan.aggregate({
+            _sum: {
+                serviceActivatedCount: true,
+            },
+            where: {
+                planType: 'prepaid',
+            },
+        });
 
-module.exports = {createPlan,getPlan,getPlanById, getPendingCustomers, getVerifiedCustomers,getActivatedCustomers, getAllServices, selectService, activateService ,logs};
+        const postpaidStats = await prisma.plan.aggregate({
+            _sum: {
+                serviceActivatedCount: true,
+            },
+            where: {
+                planType: 'postpaid',
+            },
+        });
+
+        const prepaidCount = prepaidStats._sum.serviceActivatedCount || 0;
+        const postpaidCount = postpaidStats._sum.serviceActivatedCount || 0;
+
+        // Fetch counts for customer statuses
+        const verifiedCount = await prisma.customer.count({
+            where: { documents: { some: { verificationStatus: 'Verified' } } },
+        });
+
+        const pendingCount = await prisma.customer.count({
+            where: { documents: { some: { verificationStatus: 'Pending' } } },
+        });
+
+        const activatedCount = await prisma.customer.count({
+            where: { services: { some: { isActive: true } } },
+        });
+
+        // Send response
+        res.json({
+            prepaidCount,
+            postpaidCount,
+            verifiedCount,
+            pendingCount,
+            activatedCount,
+        });
+    } catch (error) {
+        console.error('Error fetching statistics:', error);
+        res.status(500).json({ error: 'Unable to fetch statistics' });
+    }
+};
+
+
+
+module.exports = {createPlan,getPlan,getPlanById, getPendingCustomers, getVerifiedCustomers,getActivatedCustomers, getAllServices, selectService, activateService ,logs,statistics};

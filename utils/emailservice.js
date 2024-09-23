@@ -20,7 +20,7 @@ const sendEmailWithOTP = async (to, subject, otp) => {
             from: process.env.EMAIL_USER, // Sender address
             to: to, // List of recipients
             subject: subject, // Subject line
-            text: `Your OTP for email verification is: ${otp}`, // Plain text body
+            text: ` ${otp}`, // Plain text body
         });
 
         console.log('Email sent: %s', info.messageId);

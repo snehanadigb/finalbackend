@@ -6,11 +6,13 @@ const sendEmailWithOTP = require('../utils/emailservice');
 
 const prisma = new PrismaClient();
 
+const OTP_EXPIRY_TIME = 30 * 1000; // 30 seconds
+
 const register = async (req, res) => {
     try {
         const { f_name, l_name, email, password, phone_no, address } = req.body;
-       const hashedPassword = await bcrypt.hash(password, 10);
-
+        const hashedPassword = await bcrypt.hash(password, 10);
+        
         // Generate a 6-digit OTP
         const otp = Math.floor(100000 + Math.random() * 900000);
 
@@ -22,18 +24,17 @@ const register = async (req, res) => {
                 password: hashedPassword,
                 phone_no: phone_no,
                 address: address,
-                otp: otp, // Store OTP in the database
-                isVerified: false // Set verification status to false initially
+                otp: otp,
+                isVerified: false,
             },
         });
-      
+
         console.log("Customer registered, sending OTP...");
         
-        await sendEmailWithOTP(customer.email, "Email Verification OTP", otp);
+        await sendEmailWithOTP(customer.email, "Email Verification OTP", `your otp for email verification is ${otp}`);
         console.log("OTP sent");
         const token = jwt.sign({ id: customer.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
-        res.status(201).json({ message: 'Customer registered. OTP sent for email verification.', customerId: customer.id ,token:token});
-        
+        res.status(201).json({ message: 'Customer registered. OTP sent for email verification.', customerId: customer.id, token: token });
         
     } catch (error) {
         console.error('Error registering customer:', error);
@@ -50,14 +51,18 @@ const verifyEmailWithOTP = async (req, res) => {
             return res.status(404).json({ message: 'Customer not found' });
         }
 
+        // Check if the OTP is valid and not expired
         if (customer.otp === parseInt(otp)) {
-            await prisma.Customer.update({
-                where: { email },
-                data: { isVerified: true, otp: null }, // Clear the OTP after successful verification
-            });
+            if (Date.now() - customer.createdAt.getTime() <= OTP_EXPIRY_TIME) {
+                await prisma.Customer.update({
+                    where: { email },
+                    data: { isVerified: true, otp: null }, // Clear OTP after successful verification
+                });
 
-            res.status(200).json({ message: 'Email verified successfully', customerId: customer.id });
-
+                return res.status(200).json({ message: 'Email verified successfully', customerId: customer.id });
+            } else {
+                return res.status(400).json({ message: 'OTP has expired. Please request a new one.' });
+            }
         } else {
             res.status(400).json({ message: 'Invalid OTP' });
         }
@@ -66,6 +71,41 @@ const verifyEmailWithOTP = async (req, res) => {
         res.status(500).json({ message: 'Error verifying OTP', error });
     }
 };
+
+const resendOTP = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const customer = await prisma.customer.findUnique({ where: { email } });
+
+        if (!customer) {
+            return res.status(404).json({ message: 'Customer not found' });
+        }
+
+        // Check if 30 seconds have passed since the last OTP was sent
+        if (Date.now() - customer.createdAt.getTime() <= OTP_EXPIRY_TIME) {
+            return res.status(400).json({ message: 'Please wait before requesting a new OTP.' });
+        }
+
+        // Generate a new OTP
+        const newOtp = Math.floor(100000 + Math.random() * 900000);
+
+        await prisma.customer.update({
+            where: { email },
+            data: {
+                otp: newOtp,
+                createdAt: new Date(), // Update the time of OTP generation
+            },
+        });
+
+        await sendEmailWithOTP(customer.email, "Email Verification OTP", newOtp);
+        res.status(200).json({ message: 'New OTP sent successfully' });
+        
+    } catch (error) {
+        console.error('Error resending OTP:', error);
+        res.status(500).json({ message: 'Error resending OTP', error });
+    }
+};
+
 
 const login = async (req, res) => {
     try {
@@ -154,4 +194,4 @@ const resetPassword = async (req, res) => {
     }
 };
 
-module.exports={register,login,verifyEmailWithOTP,forgotPassword,resetPassword};
+module.exports={register,login,verifyEmailWithOTP,resendOTP,forgotPassword,resetPassword};
