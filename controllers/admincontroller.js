@@ -2,13 +2,14 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
-const sendEmail = require('../utils/emailservice'); // Import your existing email service
+const sendEmail = require('../utils/emailservice');
+const authenticateJWT=require('../middleware/authMiddleware'); // Import your existing email service
 
 const prisma = new PrismaClient();
 const router = express.Router();
 
 // Register admin
-router.post('/register', async (req, res) => {
+router.post('/register',authenticateJWT, async (req, res) => {
     const { name, email, password } = req.body;
 
     try {

@@ -7,14 +7,14 @@ const router = express.Router();
 router.post('/select-service', authenticateJWT, selectService);
 router.post('/activate-service',  authenticateJWT,activateService);
 router.get('/get-services',authenticateJWT,getAllServices);
-router.get('/get-pending-customers',getPendingCustomers);
+router.get('/get-pending-customers',authenticateJWT,getPendingCustomers);
 router.get('/get-verified-customers',authenticateJWT,getVerifiedCustomers);
 router.get('/get-activated-customers',authenticateJWT,getActivatedCustomers);
-router.post('/plans', createPlan);
+router.post('/plans', authenticateJWT,createPlan);
 router.get('/getplans',getPlan);
-router.get('/getplans/:planId', getPlanById);
+router.get('/getplans/:planId', authenticateJWT,getPlanById);
 router.get('/get-document-verification-logs', authenticateJWT,logs);
-router.get('/statistics',statistics);
+router.get('/statistics',authenticateJWT,statistics);
 
 
 module.exports = router;
