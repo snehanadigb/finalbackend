@@ -257,6 +257,7 @@ const logs =  async (req, res) => {
             include: {
                 customer: {
                     select: {
+                        id:true,
                         first_name: true,
                         last_name: true,
                         email: true
@@ -320,9 +321,27 @@ const statistics = async (req, res) => {
             where: { documents: { some: { verificationStatus: 'Verified' } } },
         });
 
-        const pendingCount = await prisma.customer.count({
-            where: { documents: { some: { verificationStatus: 'Pending' } } },
+        const noDocumentCount = await prisma.customer.count({
+            where: {
+                documents: {
+                    none: {}  // No documents uploaded
+                },
+            },
         });
+        
+        const pendingOrFailedCount = await prisma.customer.count({
+            where: {
+                documents: {
+                    some: {
+                        OR: [
+                            { verificationStatus: 'Pending' },
+                            { verificationStatus: 'Failed' }
+                        ]
+                    }
+                }
+            },
+        });
+        const pendingCount=noDocumentCount+pendingOrFailedCount;
 
         const activatedCount = await prisma.customer.count({
             where: { services: { some: { isActive: true } } },
