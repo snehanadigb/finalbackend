@@ -46,7 +46,7 @@ const saveDocument = async (filePath, customerId) => {
 // Function to send the document for Aadhaar verification
 const verifyDocument = async (filePath) => {
     try {
-        const response = await axios.post('http://localhost:5009/extract', {
+        const response = await axios.post(`${process.env.OCR_URL}/extract`, {
             filePath: filePath
         });
         console.log(response.data.success);
